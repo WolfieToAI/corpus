@@ -1,0 +1,8 @@
+# CI override: cache the embedding model on the runner between workflow runs.
+services:
+  api:
+    volumes:
+      - ${MODEL_CACHE:-./.models}:/models
+  worker:
+    volumes:
+      - ${MODEL_CACHE:-./.models}:/models

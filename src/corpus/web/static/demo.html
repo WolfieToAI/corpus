@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Corpus demo - chat with your documents</title>
+  <meta name="description" content="Live demo of Corpus: ask questions about a document set and get answers with page-level citations, through an embeddable chat widget.">
+  <style>
+    :root {
+      --bg: #f7f7f5; --surface: #ffffff; --text: #16181d; --muted: #5c6370;
+      --border: #e3e4e0; --accent: #2b59c3; --radius: 14px;
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1114; --surface: #17191e; --text: #eceef2; --muted: #9aa1ad;
+              --border: #2a2e35; --accent: #7aa2ff; }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    main {
+      max-width: 1120px; margin: 0 auto;
+      padding: max(24px, env(safe-area-inset-top)) 16px 48px;
+      display: grid; gap: 32px; grid-template-columns: 1fr;
+    }
+    @media (min-width: 900px) { main { grid-template-columns: 1fr 440px; align-items: start; padding-top: 64px; } }
+    .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
+    h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.1; margin: 8px 0 16px; letter-spacing: -0.02em; text-wrap: balance; }
+    .lead { color: var(--muted); font-size: 18px; max-width: 56ch; margin: 0 0 28px; }
+    ul.points { list-style: none; padding: 0; margin: 0 0 32px; display: grid; gap: 12px; }
+    ul.points li { display: flex; gap: 12px; }
+    ul.points b { display: block; }
+    ul.points span { color: var(--muted); font-size: 15px; }
+    .dot { flex: none; width: 8px; height: 8px; margin-top: 9px; border-radius: 50%; background: var(--accent); }
+    h2 { font-size: 15px; margin: 0 0 8px; }
+    pre {
+      margin: 0; padding: 14px 16px; overflow-x: auto; border-radius: 10px;
+      background: var(--surface); border: 1px solid var(--border); font-size: 13px; line-height: 1.5;
+    }
+    .copy {
+      margin-top: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+      border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer;
+      transition: transform 160ms var(--ease-out);
+    }
+    .copy:active { transform: scale(0.97); }
+    .demo { height: min(640px, calc(100dvh - 48px)); }
+    @media (max-width: 899px) { .demo { height: 560px; } }
+    corpus-chat { display: block; height: 100%; }
+    .setup {
+      background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius);
+      padding: 20px; display: grid; gap: 12px;
+    }
+    .setup p { margin: 0; color: var(--muted); font-size: 15px; }
+    label { display: grid; gap: 4px; font-size: 14px; font-weight: 600; }
+    input {
+      font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0;
+    }
+    .go {
+      border: 0; border-radius: 10px; padding: 11px 16px; background: var(--accent); color: #fff;
+      font: inherit; font-weight: 600; cursor: pointer; transition: transform 160ms var(--ease-out);
+    }
+    .go:active { transform: scale(0.97); }
+    code { font-size: 0.92em; }
+    footer { grid-column: 1 / -1; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); padding-top: 20px; }
+    a { color: var(--accent); }
+    @media (prefers-reduced-motion: reduce) { .copy, .go { transition: none; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <div class="eyebrow">Corpus · live demo</div>
+      <h1>Ask your documents. Get answers you can verify.</h1>
+      <p class="lead">
+        This assistant only answers from the documents it was given: a robot vacuum manual,
+        HR policies, an API reference, an SLA. Every claim links to the passage it comes from.
+      </p>
+      <ul class="points">
+        <li><i class="dot"></i><div><b>Cited, page by page</b><span>Click a number in an answer to read the exact excerpt.</span></div></li>
+        <li><i class="dot"></i><div><b>Hybrid search</b><span>Finds paraphrases and exact codes like E-317 or FLT-4012.</span></div></li>
+        <li><i class="dot"></i><div><b>Knows what it does not know</b><span>Questions outside the documents get an honest "not in the documents".</span></div></li>
+        <li><i class="dot"></i><div><b>Follows the conversation</b><span>Ask "and for the R7?" after a question about the R5.</span></div></li>
+      </ul>
+      <h2>Add it to any website</h2>
+      <pre id="snippet"><code></code></pre>
+      <button class="copy" type="button" id="copy">Copy snippet</button>
+    </section>
+
+    <section class="demo" id="demo" aria-label="Chat demo"></section>
+
+    <footer>
+      Built with FastAPI, PostgreSQL (pgvector, full-text search, row-level security) and a
+      streaming LLM. Source code and design notes on
+      <a href="https://github.com/WolfieToAI/corpus">GitHub</a>.
+    </footer>
+  </main>
+
+  <script src="/widget.js"></script>
+  <script>
+    (function () {
+      const params = new URLSearchParams(location.search);
+      const demo = document.getElementById("demo");
+      const origin = location.origin;
+
+      function mount(collection, key) {
+        const chat = document.createElement("corpus-chat");
+        chat.setAttribute("mode", "inline");
+        chat.setAttribute("api-url", origin);
+        chat.setAttribute("collection", collection);
+        chat.setAttribute("api-key", key);
+        chat.setAttribute("heading", "Northwind documentation assistant");
+        chat.setAttribute("suggestions",
+          "How long does the R7 take to charge?|What does error E-317 mean?|How many days can I work remotely in France?|What uptime does the Enterprise plan guarantee?");
+        demo.replaceChildren(chat);
+        renderSnippet(collection, key);
+      }
+
+      function renderSnippet(collection, key) {
+        const code = `<script src="${origin}/widget.js"\n        data-collection="${collection || "COLLECTION_ID"}"\n        data-api-key="${key || "crp_WIDGET_KEY"}" defer><\/script>`;
+        document.querySelector("#snippet code").textContent = code;
+      }
+
+      document.getElementById("copy").addEventListener("click", async (e) => {
+        try {
+          await navigator.clipboard.writeText(document.querySelector("#snippet code").textContent);
+          e.target.textContent = "Copied";
+          setTimeout(() => (e.target.textContent = "Copy snippet"), 1500);
+        } catch (_) { /* clipboard unavailable: the snippet stays selectable */ }
+      });
+
+      const collection = params.get("collection");
+      const key = params.get("key");
+      if (collection && key) {
+        mount(collection, key);
+        return;
+      }
+      renderSnippet();
+      // Hosted demo (DEMO_MODE): the server hands out the demo collection and its widget key.
+      (function loadConfig(attempt) {
+        fetch("/demo/config").then((r) => {
+          if (r.ok) return r.json().then((c) => mount(c.collection, c.key));
+          // 503 while the demo is being seeded right after a (cold) start: try again shortly.
+          if (r.status === 503 && attempt < 30) setTimeout(() => loadConfig(attempt + 1), 3000);
+        }).catch(() => {});
+      })(0);
+      demo.innerHTML = `
+        <form class="setup" id="setup">
+          <h2>Connect the demo</h2>
+          <p>Run <code>corpus-demo</code> on the server: it indexes the sample documents and prints
+             a link with a widget key. Or paste a collection id and a widget key below.</p>
+          <label>Collection id <input name="collection" required autocomplete="off" spellcheck="false"></label>
+          <label>Widget key <input name="key" required autocomplete="off" spellcheck="false" placeholder="crp_..."></label>
+          <button class="go" type="submit">Start chatting</button>
+        </form>`;
+      document.getElementById("setup").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const data = new FormData(e.target);
+        mount(String(data.get("collection")).trim(), String(data.get("key")).trim());
+      });
+    })();
+  </script>
+</body>
+</html>

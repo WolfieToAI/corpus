@@ -1,0 +1,74 @@
+name: Load test
+
+# Boots the production stack (API + 2 workers + PostgreSQL) from the Docker image and drives it
+# with k6. The extractive generator stands in for the LLM so that the numbers measure the
+# platform itself, not a provider's latency.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: "Duration of each scenario (k6 syntax, e.g. 60s, 3m)"
+        default: "60s"
+      search_rps:
+        description: "Search requests per second"
+        default: "20"
+
+concurrency:
+  group: loadtest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MODEL_CACHE: ${{ github.workspace }}/.models
+      COMPOSE: docker compose -f docker-compose.yml -f loadtest/docker-compose.ci.yml
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: .models
+          key: fastembed-docker-${{ hashFiles('src/corpus/config.py') }}
+
+      - name: Configure the stack
+        run: |
+          mkdir -p .models loadtest/results && chmod 777 .models loadtest/results
+          cat > .env <<'EOF'
+          ADMIN_API_KEY=loadtest-admin-key
+          LLM_PROVIDER=extractive
+          EMBEDDING_PROVIDER=fastembed
+          RERANKER=none
+          LOG_LEVEL=WARNING
+          EOF
+
+      - name: Start API, workers and database
+        run: $COMPOSE up -d --build --wait --wait-timeout 600 api worker
+
+      - name: Run k6
+        run: |
+          docker run --rm --network host --user "$(id -u)" \
+            -v "$PWD:/work" -w /work/loadtest/k6 \
+            -e BASE_URL=http://localhost:8000 -e ADMIN_API_KEY=loadtest-admin-key \
+            -e DURATION=${{ inputs.duration || '60s' }} \
+            -e SEARCH_RPS=${{ inputs.search_rps || '20' }} \
+            grafana/k6:0.54.0 run corpus.js
+
+      - name: Publish the report
+        if: always()
+        run: cat loadtest/results/summary.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Service logs on failure
+        if: failure()
+        run: $COMPOSE logs --tail 200 api worker
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: loadtest-results
+          path: loadtest/results/
+
+      - if: always()
+        run: $COMPOSE down -v

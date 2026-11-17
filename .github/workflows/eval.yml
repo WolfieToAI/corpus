@@ -1,0 +1,69 @@
+name: Evaluation
+
+# Retrieval quality is measured with the real models on every push to main; the LLM-judged
+# answer evaluation calls the LLM API, so it only runs on demand.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      answers:
+        description: "Also run the LLM-judged answer evaluation (needs the LLM_API_KEY secret and the LLM_MODEL variable)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: corpus
+          POSTGRES_PASSWORD: corpus
+          POSTGRES_DB: corpus_eval
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U corpus -d corpus_eval"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://corpus:corpus@localhost:5432/corpus_eval
+      EMBEDDING_PROVIDER: fastembed
+      RERANKER: cross-encoder
+      FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.models
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_MODEL: ${{ vars.LLM_MODEL }}
+      LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://api.openai.com/v1' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/cache@v4
+        with:
+          path: .models
+          key: fastembed-${{ hashFiles('src/corpus/config.py') }}
+      - run: pip install -e ".[local-embeddings]"
+
+      - name: Retrieval evaluation
+        run: corpus-eval retrieval --out eval/results
+
+      - name: Answer evaluation (LLM judge)
+        if: ${{ inputs.answers && env.LLM_API_KEY != '' }}
+        run: corpus-eval answers --out eval/results
+
+      - name: Publish the report
+        if: always()
+        run: cat eval/results/*.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: eval/results/

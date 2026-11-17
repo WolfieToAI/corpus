@@ -1,0 +1,53 @@
+# Render Blueprint (production): managed PostgreSQL (pgvector) + API + separate worker, built
+# from the repository's Dockerfile on paid instances. In the Render dashboard, create a new
+# Blueprint and point it at this file path. The free single-instance demo is ../render.yaml.
+databases:
+  - name: corpus-db
+    databaseName: corpus
+    user: corpus
+    plan: basic-256mb
+    postgresMajorVersion: "17"
+
+envVarGroups:
+  - name: corpus-shared
+    envVars:
+      - key: EMBEDDING_PROVIDER
+        value: fastembed
+      - key: LLM_PROVIDER
+        value: openai-compatible  # set to "extractive" for a key-free demo
+      - key: LLM_BASE_URL
+        value: https://api.openai.com/v1
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false               # entered in the Render dashboard, never committed
+      - key: ADMIN_API_KEY
+        generateValue: true
+      - key: LOG_FORMAT
+        value: json
+
+services:
+  - type: web
+    name: corpus-api
+    runtime: docker
+    plan: standard                # embedding models need ~1 GB of RAM
+    healthCheckPath: /health
+    preDeployCommand: alembic upgrade head
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: DATABASE_URL
+        fromDatabase: { name: corpus-db, property: connectionString }
+      - fromGroup: corpus-shared
+
+  - type: worker
+    name: corpus-worker
+    runtime: docker
+    plan: standard
+    dockerCommand: corpus-worker
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: corpus-db, property: connectionString }
+      - fromGroup: corpus-shared

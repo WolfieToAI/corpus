@@ -1,0 +1,47 @@
+# Render Blueprint - free live demo on a single instance.
+#
+#   https://render.com/deploy?repo=https://github.com/WolfieToAI/corpus
+#
+# One free web service runs the API, the ingestion worker (EMBEDDED_WORKER) and seeds the sample
+# documents (DEMO_MODE); migrations run at startup (AUTO_MIGRATE). The database is external:
+# paste the *direct* (non-pooled) connection string of a free Neon project into DATABASE_URL -
+# Neon's free tier does not expire, supports pgvector and lets the app create its RLS role.
+#
+# For production (separate worker service, managed database, pre-deploy migrations) use
+# deploy/render.production.yaml.
+services:
+  - type: web
+    name: corpus
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false               # Neon connection string, entered in the Render dashboard
+      - key: AUTO_MIGRATE
+        value: "true"
+      - key: EMBEDDED_WORKER
+        value: "true"
+      - key: DEMO_MODE
+        value: "true"
+      - key: LLM_PROVIDER
+        value: extractive         # "openai-compatible" + LLM_* below for LLM-written answers
+      - key: LLM_BASE_URL
+        value: https://api.openai.com/v1
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: ADMIN_API_KEY
+        generateValue: true
+      # Fit the free instance (512 MB): a compact English embedding model, small pools.
+      - key: EMBEDDING_MODEL
+        value: BAAI/bge-small-en-v1.5
+      - key: WORKER_CONCURRENCY
+        value: "1"
+      - key: DB_POOL_SIZE
+        value: "3"
+      - key: DB_MAX_OVERFLOW
+        value: "4"
+      - key: LOG_FORMAT
+        value: json

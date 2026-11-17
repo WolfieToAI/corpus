@@ -1,0 +1,29 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Evaluation outputs (published by CI) and model caches
+eval/results/
+loadtest/results/
+.models/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "corpus"
+version = "1.2.0"
+description = "Multi-tenant Retrieval-Augmented Generation platform: hybrid search, cited answers, durable ingestion queue."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "pgvector>=0.3.6",
+    "openai>=1.54",
+    "httpx>=0.27",
+    "pypdf>=5.1",
+    "python-multipart>=0.0.17",
+    "alembic>=1.14",
+    "prometheus-client>=0.21",
+    "opentelemetry-api>=1.28",
+    "opentelemetry-sdk>=1.28",
+    "opentelemetry-exporter-otlp-proto-http>=1.28",
+    "opentelemetry-instrumentation-fastapi>=0.49b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.49b0",
+    "opentelemetry-instrumentation-httpx>=0.49b0",
+]
+
+[project.scripts]
+corpus-worker = "corpus.worker:main"
+corpus-eval = "corpus.evaluation.cli:main"
+corpus-demo = "corpus.demo:main"
+
+[project.optional-dependencies]
+local-embeddings = ["fastembed>=0.4"]
+ocr = ["pytesseract>=0.3.13", "pypdfium2>=4.30", "pillow>=10.4"]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/corpus"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = ["integration: requires a running PostgreSQL + pgvector (TEST_DATABASE_URL)"]

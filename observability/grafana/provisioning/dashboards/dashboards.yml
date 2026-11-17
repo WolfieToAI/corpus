@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: corpus
+    folder: Corpus
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

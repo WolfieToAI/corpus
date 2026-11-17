@@ -1,0 +1,43 @@
+# Alerts on symptoms users feel (errors, latency, stuck ingestion), not on internal causes.
+groups:
+  - name: corpus
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(corpus_http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(corpus_http_requests_total[5m])), 1e-9) > 0.02
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "More than 2% of API requests fail with 5xx"
+
+      - alert: SlowSearch
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(corpus_http_request_duration_seconds_bucket{route=~".*/search"}[5m]))
+          ) > 0.5
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Search p95 latency above 500 ms"
+
+      - alert: IngestionBacklog
+        expr: max(corpus_queue_oldest_ready_seconds) > 300
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "A document has waited more than 5 minutes for a worker"
+          description: "Scale workers (docker compose up --scale worker=N) or look for a stuck dependency."
+
+      - alert: JobsDeadLettered
+        expr: increase(corpus_jobs_total{outcome="dead"}[15m]) > 0
+        labels: { severity: ticket }
+        annotations:
+          summary: "Ingestion jobs were dead-lettered"
+
+      - alert: LLMErrors
+        expr: sum(rate(corpus_llm_errors_total{reason!="client_disconnected"}[10m])) > 0.05
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Answer generation is failing or being refused"
